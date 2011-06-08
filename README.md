@@ -71,7 +71,6 @@ In the following pseudo code example the hash() function is a sha1 hash.
 In the following pseudo code example the hash() function is a sha1 hash.
 
     CLIENT -> [username="foo_man_choo"] -> SERVER
-    SERVER nonce = createNonce() and nextnonce = createNonce()
     SERVER -> [username="foo_man_choo", nonce="sdfp0893w4r", nextnonce="sd09u234"] -> CLIENT
     CLIENT response = hash(nonce + passkey)
     CLIENT cnonce = hash(hash(nextnonce + passkey))
