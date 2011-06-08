@@ -3,8 +3,8 @@ The CHAP
 Challenge Handshake Authentication Protocol
 -------------------------------------------
 
-A simple challenge handshake implementation for JavaScript environments
-including Node.js and browsers.
+A simple challenge handshake authentication implementation for JavaScript
+environments including Node.js and browsers.
 
 Based on the [alternative CHAP algorithm by Paul Johnston](http://pajhome.org.uk/crypt/md5/advancedauth.html#alternative)
 
