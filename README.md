@@ -1,4 +1,5 @@
 The CHAP
+========
 
 Challenge Handshake Authentication Protocol
 -------------------------------------------
