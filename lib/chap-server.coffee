@@ -31,71 +31,99 @@ createNonce = (keyString) ->
 
 exports.createNonce = createNonce
 
-authenticate = (user, storeUser) ->
+createAuth = (user) ->
+    username  = null
+    nonce     = null
+    nextnonce = null
+    cnonce    = null
+    response  = null
+    passkey   = null
+
     user or= {}
+    if user.username and typeof user.username is 'string'
+        username = user.username
+    if user.response and typeof user.response is 'string'
+        response = user.response
+    if user.cnonce and typeof user.cnonce is 'string'
+        cnonce = user.cnonce
 
-    if not user or typeof user.username isnt 'string'
-        throw new Error('A user.username string must be provided to .authenticate()')
+    self =
+        updateUser: (storedUser) ->
+            storedUser or= {}
+            if storedUser.nonce and typeof storedUser.nonce is 'string'
+                nonce = storedUser.nonce
+            if storedUser.nextnonce and typeof storedUser.nextnonce is 'string'
+                nextnonce = storedUser.nextnonce
+            if storedUser.passkey and typeof storedUser.passkey is 'string'
+                passkey = storedUser.passkey
+            return
 
-    if not user.nonce or typeof user.nonce isnt 'string'
-        user.nonce = null
-    if not user.nextnonce or typeof user.nextnonce isnt 'string'
-        user.nextnonce = null
-    if not user.cnonce or typeof user.cnonce isnt 'string'
-        user.cnonce = null
-    if not user.response or typeof user.response isnt 'string'
-        user.response = null
-    if not user.passkey or typeof user.passkey isnt 'string'
-        user.passkey = null
+        validate: ->
+            if not username
+                msg = 'A user.username string must be provided to authenticate'
+                throw new Error(msg)
+            return
 
-    # New user case (no nonce or nextnonce)
-    if user.nonce is null or user.nextnonce is null
-        user.nonce = createNonce(user.username)
-        user.nextnonce = createNonce(user.username)
-        user.message = exports.USER_NA
-        user.authenticated = false
-        user.passkey = null
-        storeUser(user)
-        return user
+        authenticate: (storeUser) ->
+            storedUser = {}
+            returnedUser = {}
 
-    # Missing cnonce or response credentials
-    if user.cnonce is null or user.response is null
-        user.message = exports.MISSING_CREDS
-        user.authenticated = false
-        return user
+            returnedUser.username = storedUser.username = username
+            returnedUser.nonce = storedUser.nonce = nonce
+            returnedUser.nextnonce = storedUser.nextnonce = nextnonce
+            storedUser.passkey = passkey
 
-    # No stored passkey, so the user is setting or re-setting their account
-    if user.passkey is null
-        user.passkey = user.cnonce
-        user.nonce = user.nextnonce
-        user.nextnonce = createNonce(user.username)
-        user.authenticated = true
-        user.message = exports.SET_PASSKEY
-        storeUser(user)
-        return user
+            # New user case (no nonce or nextnonce)
+            if nonce is null or nextnonce is null
+                returnedUser.nonce = storedUser.nonce = createNonce(username)
+                returnedUser.nextnonce = storedUser.nextnonce = createNonce(username)
+                returnedUser.message = exports.USER_NA
+                returnedUser.authenticated = false
+                storedUser.passkey = null
+                storeUser(storedUser)
+                return returnedUser
 
-    # Now that we know the passkey, nonce, and nextnonce we have to make sure
-    # that the client has actually computed the response and cnonce with the
-    # nonce, nextnonce, and user secret.
-    falseCnonce = sha1(sha1(user.nextnonce))
-    falseResponse = sha1(user.nonce)
-    if user.cnonce is falseCnonce or user.response is falseResponse
-        user.authenticated = false
-        user.message = exports.UNMODIFIED
-        return user
+            # Missing cnonce or response credentials
+            if cnonce is null or response is null
+                returnedUser.message = exports.MISSING_CREDS
+                returnedUser.authenticated = false
+                return returnedUser
 
-    # Passkey mismatch; authentication denied
-    if sha1(user.response) isnt user.passkey
-        user.authenticated = false
-        user.message = exports.DENIED
-        return user
+            # No stored passkey, so the user is setting or re-setting their account
+            if passkey is null
+                storedUser.passkey = cnonce
+                returnedUser.nonce = storedUser.nonce = nextnonce
+                returnedUser.nextnonce = storedUser.nextnonce = createNonce(username)
+                returnedUser.authenticated = true
+                returnedUser.message = exports.SET_PASSKEY
+                storeUser(storedUser)
+                return returnedUser
 
-    user.passkey = user.cnonce
-    user.nonce = user.nextnonce
-    user.nextnonce = createNonce(user.username)
-    user.authenticated = true
-    user.message = exports.OK
-    storeUser(user)
-    return user
+            # Now that we know the passkey, nonce, and nextnonce we have to make sure
+            # that the client has actually computed the response and cnonce with the
+            # nonce, nextnonce, and user secret.
+            falseCnonce = sha1(sha1(nextnonce))
+            falseResponse = sha1(nonce)
+            if cnonce is falseCnonce or response is falseResponse
+                returnedUser.authenticated = false
+                returnedUser.message = exports.UNMODIFIED
+                return returnedUser
 
-exports.authenticate = authenticate
+            # Passkey mismatch; authentication denied
+            if sha1(response) isnt passkey
+                returnedUser.authenticated = false
+                returnedUser.message = exports.DENIED
+                return returnedUser
+
+            # User is OK
+            storedUser.passkey = cnonce
+            returnedUser.nonce = storedUser.nonce = nextnonce
+            returnedUser.nextnonce = storedUser.nextnonce = createNonce(username)
+            returnedUser.authenticated = true
+            returnedUser.message = exports.OK
+            storeUser(storedUser)
+            return returnedUser
+
+    return self
+
+exports.createAuth = createAuth

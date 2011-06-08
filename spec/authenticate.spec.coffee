@@ -2,52 +2,53 @@ crypto = require 'crypto'
 
 chap = require '../lib/chap-server'
 
-describe 'authenticate() invalid parameters', ->
+describe 'Authenticator.validate() invalid parameters', ->
 
     it 'should throw an error if the username string is not available', ->
         err = false
+        auth = chap.createAuth()
+        auth.updateUser()
+
         try
-            chap.authenticate()
+            auth.validate()
         catch e
             err = e
 
         expect(typeof err).toBe 'object'
-        expect(err.message).toBe 'A user.username string must be provided to .authenticate()'
+        expect(err.message).toBe 'A user.username string must be provided to authenticate'
         return
 
 describe 'create a new user with authenticate()', ->
 
     it 'should "create" a new user', ->
-        user =
-            username: 'x'
-
         testPersistCalled = false
 
-        checkUserAttr = (user) ->
-            # nonce
-            expect(typeof user.nonce).toBe 'string'
-            expect(user.nonce.length).toBe 40
+        auth = chap.createAuth({username: 'x'})
+        auth.updateUser()
+        auth.validate()
 
-            # nextnonce
-            expect(typeof user.nextnonce).toBe 'string'
-            expect(user.nextnonce.length).toBe 40
-
-            # passkey
-            expect(user.passkey).toBe null
-
-            # authenticated
-            expect(user.authenticated).toBe false
-
-            # message
-            expect(user.message).toBe chap.USER_NA
-            return
+        nonce = null
+        nextnonce = null
 
         testPersist = (user) ->
             testPersistCalled = true
-            return checkUserAttr(user)
+            expect(user.username).toBe 'x'
+            expect(typeof user.nonce).toBe 'string'
+            expect(user.nonce.length).toBe 40
+            nonce = user.nonce
+            expect(typeof user.nextnonce).toBe 'string'
+            expect(user.nextnonce.length).toBe 40
+            nextnonce = user.nextnonce
+            expect(user.passkey).toBe null
+            return
 
-        newUser = chap.authenticate(user, testPersist)
-        checkUserAttr(newUser)
+        newUser = auth.authenticate(testPersist)
+        expect(typeof newUser.passkey).toBe 'undefined'
+        expect(newUser.nonce).toBe nonce
+        expect(newUser.nextnonce).toBe nextnonce
+        expect(newUser.authenticated).toBe false
+        expect(newUser.message).toBe chap.USER_NA
+        expect(newUser.username).toBe 'x'
 
         expect(testPersistCalled).toBe true
         return
@@ -56,35 +57,23 @@ describe 'create a new user with authenticate()', ->
 describe 'authenticate() should deny authentication without creds', ->
 
     it 'should deny authentication', ->
-        user =
-            username: 'x'
-            nonce: 'y'
-            nextnonce: 'z'
-
         testPersistCalled = false
 
-        checkUserAttr = (user) ->
-            # nonce
-            expect(user.nonce).toBe 'y'
-
-            # nextnonce
-            expect(user.nextnonce).toBe 'z'
-
-            # passkey
-            expect(user.passkey).toBe null
-
-            # authenticated
-            expect(user.authenticated).toBe false
-
-            # message
-            expect(user.message).toBe chap.MISSING_CREDS
-            return
+        auth = chap.createAuth({username: 'x'})
+        auth.updateUser({nonce: 'y', nextnonce: 'z'})
+        auth.validate()
 
         testPersist = (user) ->
             return testPersistCalled = true
 
-        newUser = chap.authenticate(user, testPersist)
-        checkUserAttr(newUser)
+        newUser = auth.authenticate(testPersist)
+        expect(typeof newUser.passkey).toBe 'undefined'
+        expect(newUser.nonce).toBe 'y'
+        expect(newUser.nextnonce).toBe 'z'
+        expect(newUser.authenticated).toBe false
+        expect(newUser.message).toBe chap.MISSING_CREDS
+        expect(newUser.username).toBe 'x'
+        return
 
         expect(testPersistCalled).toBe false
         return
@@ -93,41 +82,34 @@ describe 'authenticate() should deny authentication without creds', ->
 describe 'autheticate() should create a new passkey for a user without one', ->
 
     it 'should create a passkey and authenticate', ->
-        user =
-            username: 'x'
-            nonce: 'a'
-            nextnonce: 'b'
-            cnonce: 'c'
-            response: 'd'
-
         testPersistCalled = false
 
-        checkUserAttr = (user) ->
-            # nonce
-            expect(user.nonce).toBe 'b'
+        auth = chap.createAuth({username: 'x', cnonce: 'c', response: 'd'})
+        auth.updateUser({nonce: 'a', nextnonce: 'b'})
+        auth.validate()
 
-            # nextnonce
-            expect(typeof user.nextnonce).toBe 'string'
-            expect(user.nextnonce.length).toBe 40
 
-            # passkey
-            expect(user.passkey).toBe 'c'
-
-            # authenticated
-            expect(user.authenticated).toBe true
-
-            # message
-            expect(user.message).toBe chap.SET_PASSKEY
-            return
+        nextnonce = null
 
         testPersist = (user) ->
             testPersistCalled = true
-            return checkUserAttr(user)
+            expect(user.username).toBe 'x'
+            expect(user.nonce).toBe 'b'
+            expect(typeof user.nextnonce).toBe 'string'
+            expect(user.nextnonce.length).toBe 40
+            nextnonce = user.nextnonce
+            expect(user.passkey).toBe 'c'
+            expect(typeof user.authenticated).toBe 'undefined'
+            return
 
-        newUser = chap.authenticate(user, testPersist)
-        checkUserAttr(newUser)
-
+        newUser = auth.authenticate(testPersist)
+        expect(typeof newUser.passkey).toBe 'undefined'
+        expect(newUser.nonce).toBe 'b'
+        expect(newUser.nextnonce).toBe nextnonce
+        expect(newUser.authenticated).toBe true
+        expect(newUser.message).toBe chap.SET_PASSKEY
         expect(testPersistCalled).toBe true
+        expect(newUser.username).toBe 'x'
         return
 
 
@@ -141,36 +123,25 @@ describe 'authenticate() authentication', ->
 
         user =
             username: 'x'
-            nonce: nonce
-            nextnonce: nextnonce
             cnonce: cnonce
             response: response
-            passkey: 'y'
 
         testPersistCalled = false
 
-        checkUserAttr = (user) ->
-            # nonce
-            expect(user.nonce).toBe 'a'
-
-            # nextnonce
-            expect(user.nextnonce).toBe 'b'
-
-            # passkey
-            expect(user.passkey).toBe 'y'
-
-            # authenticated
-            expect(user.authenticated).toBe false
-
-            # message
-            expect(user.message).toBe chap.UNMODIFIED
-            return
+        auth = chap.createAuth(user)
+        auth.updateUser({nonce: nonce, nextnonce: nextnonce, passkey: 'y'})
+        auth.validate()
 
         testPersist = (user) ->
             return testPersistCalled = true
 
-        newUser = chap.authenticate(user, testPersist)
-        checkUserAttr(newUser)
+        newUser = auth.authenticate(testPersist)
+        expect(typeof newUser.passkey).toBe 'undefined'
+        expect(newUser.nonce).toBe 'a'
+        expect(newUser.nextnonce).toBe 'b'
+        expect(newUser.authenticated).toBe false
+        expect(newUser.message).toBe chap.UNMODIFIED
+        expect(newUser.username).toBe 'x'
 
         expect(testPersistCalled).toBe false
         return
@@ -178,36 +149,25 @@ describe 'authenticate() authentication', ->
     it 'should not authenticate if the computed passkey does not match', ->
         user =
             username: 'x'
-            nonce: 'x'
-            nextnonce: 'x'
             cnonce: 'x'
             response: 'x'
-            passkey: 'x'
 
         testPersistCalled = false
 
-        checkUserAttr = (user) ->
-            # nonce
-            expect(user.nonce).toBe 'x'
-
-            # nextnonce
-            expect(user.nextnonce).toBe 'x'
-
-            # passkey
-            expect(user.passkey).toBe 'x'
-
-            # authenticated
-            expect(user.authenticated).toBe false
-
-            # message
-            expect(user.message).toBe chap.DENIED
-            return
+        auth = chap.createAuth(user)
+        auth.updateUser({nonce: 'x', nextnonce: 'x', passkey: 'x'})
+        auth.validate()
 
         testPersist = (user) ->
             return testPersistCalled = true
 
-        newUser = chap.authenticate(user, testPersist)
-        checkUserAttr(newUser)
+        newUser = auth.authenticate(testPersist)
+        expect(typeof newUser.passkey).toBe 'undefined'
+        expect(newUser.nonce).toBe 'x'
+        expect(newUser.nextnonce).toBe 'x'
+        expect(newUser.authenticated).toBe false
+        expect(newUser.message).toBe chap.DENIED
+        expect(newUser.username).toBe 'x'
 
         expect(testPersistCalled).toBe false
         return
@@ -215,38 +175,37 @@ describe 'authenticate() authentication', ->
     it 'should authenticate if the computed passkey matches', ->
         user =
             username: 'a'
-            nonce: 'b'
-            nextnonce: 'c'
             cnonce: 'd'
             response: 'e'
+
+        storedUser =
             passkey: '58e6b3a414a1e090dfc6029add0f3555ccba127f'
+            nonce: 'b'
+            nextnonce: 'c'
 
         testPersistCalled = false
 
-        checkUserAttr = (user) ->
-            # nonce
-            expect(user.nonce).toBe 'c'
-
-            # nextnonce
-            expect(typeof user.nextnonce).toBe 'string'
-            expect(user.nextnonce.length).toBe 40
-
-            # passkey
-            expect(user.passkey).toBe 'd'
-
-            # authenticated
-            expect(user.authenticated).toBe true
-
-            # message
-            expect(user.message).toBe chap.OK
-            return
+        auth = chap.createAuth(user)
+        auth.updateUser(storedUser)
+        auth.validate()
 
         testPersist = (user) ->
             testPersistCalled = true
-            return checkUserAttr(user)
+            expect(user.username).toBe 'a'
+            expect(user.nonce).toBe 'c'
+            expect(typeof user.nextnonce).toBe 'string'
+            expect(user.nextnonce.length).toBe 40
+            expect(user.passkey).toBe 'd'
+            return
 
-        newUser = chap.authenticate(user, testPersist)
-        checkUserAttr(newUser)
+        newUser = auth.authenticate(testPersist)
+        expect(newUser.username).toBe 'a'
+        expect(typeof newUser.passkey).toBe 'undefined'
+        expect(newUser.authenticated).toBe true
+        expect(newUser.message).toBe chap.OK
+        expect(newUser.nonce).toBe 'c'
+        expect(typeof newUser.nextnonce).toBe 'string'
+        expect(newUser.nextnonce.length).toBe 40
 
         expect(testPersistCalled).toBe true
         return
