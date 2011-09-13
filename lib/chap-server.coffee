@@ -56,13 +56,13 @@ createAuth = (user) ->
                 nextnonce = storedUser.nextnonce
             if storedUser.passkey and typeof storedUser.passkey is 'string'
                 passkey = storedUser.passkey
-            return
+            return self
 
         validate: ->
             if not username
                 msg = 'A user.username string must be provided to authenticate'
                 throw new Error(msg)
-            return
+            return self
 
         authenticate: (storeUser) ->
             storedUser = {}

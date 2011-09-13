@@ -6,8 +6,7 @@ describe 'Authenticator.validate() invalid parameters', ->
 
     it 'should throw an error if the username string is not available', ->
         err = false
-        auth = chap.createAuth()
-        auth.updateUser()
+        auth = chap.createAuth().updateUser()
 
         try
             auth.validate()
@@ -24,8 +23,8 @@ describe 'create a new user with authenticate()', ->
         testPersistCalled = false
 
         auth = chap.createAuth({username: 'x'})
-        auth.updateUser()
-        auth.validate()
+            .updateUser()
+            .validate()
 
         nonce = null
         nextnonce = null
@@ -60,8 +59,8 @@ describe 'authenticate() should deny authentication without creds', ->
         testPersistCalled = false
 
         auth = chap.createAuth({username: 'x'})
-        auth.updateUser({nonce: 'y', nextnonce: 'z'})
-        auth.validate()
+            .updateUser({nonce: 'y', nextnonce: 'z'})
+            .validate()
 
         testPersist = (user) ->
             return testPersistCalled = true
@@ -85,8 +84,8 @@ describe 'autheticate() should create a new passkey for a user without one', ->
         testPersistCalled = false
 
         auth = chap.createAuth({username: 'x', cnonce: 'c', response: 'd'})
-        auth.updateUser({nonce: 'a', nextnonce: 'b'})
-        auth.validate()
+            .updateUser({nonce: 'a', nextnonce: 'b'})
+            .validate()
 
 
         nextnonce = null
@@ -129,8 +128,8 @@ describe 'authenticate() authentication', ->
         testPersistCalled = false
 
         auth = chap.createAuth(user)
-        auth.updateUser({nonce: nonce, nextnonce: nextnonce, passkey: 'y'})
-        auth.validate()
+            .updateUser({nonce: nonce, nextnonce: nextnonce, passkey: 'y'})
+            .validate()
 
         testPersist = (user) ->
             return testPersistCalled = true
@@ -155,8 +154,8 @@ describe 'authenticate() authentication', ->
         testPersistCalled = false
 
         auth = chap.createAuth(user)
-        auth.updateUser({nonce: 'x', nextnonce: 'x', passkey: 'x'})
-        auth.validate()
+            .updateUser({nonce: 'x', nextnonce: 'x', passkey: 'x'})
+            .validate()
 
         testPersist = (user) ->
             return testPersistCalled = true
@@ -186,8 +185,8 @@ describe 'authenticate() authentication', ->
         testPersistCalled = false
 
         auth = chap.createAuth(user)
-        auth.updateUser(storedUser)
-        auth.validate()
+            .updateUser(storedUser)
+            .validate()
 
         testPersist = (user) ->
             testPersistCalled = true
